@@ -17,6 +17,9 @@ func glitchString(s string, chance float64, intensity int) string {
 	if len(chars) == 0 {
 		return s
 	}
+	if intensity <= 0 {
+		intensity = 1
+	}
 	numGlitches := rand.Intn(intensity) + 1
 	glitchChars := []rune("█▓▒░×÷±#@_/")
 	for i := 0; i < numGlitches; i++ {
