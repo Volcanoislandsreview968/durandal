@@ -83,6 +83,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// If process list is showing a kill error, intercept keys to dismiss it
+		if m.Processes.KillErrorPopup != "" {
+			switch msg.String() {
+			case "esc", "enter":
+				m.Processes.CancelKill()
+			case "q", "ctrl+c":
+				m.quitting = true
+				return m, tea.Quit
+			}
+			return m, nil
+		}
+
 		// If process list is in kill confirmation mode, intercept specific keys
 		if m.Processes.KillConfirm {
 			switch msg.String() {

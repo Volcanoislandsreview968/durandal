@@ -2,10 +2,19 @@ package styles
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
+
+var IsRoot = false
+
+func init() {
+	if os.Geteuid() == 0 {
+		IsRoot = true
+	}
+}
 
 // ── Marathon Color Palette ──────────────────────────────────────────────────
 
@@ -31,11 +40,25 @@ var (
 	DimmedLime = lipgloss.Color("#6F8F00")
 	DimmedPink = lipgloss.Color("#8F003F")
 	DimmedCyan = lipgloss.Color("#007F8F")
+
+	RootLime = lipgloss.Color("#FF3300")
+	RootPink = lipgloss.Color("#FF0033")
+	RootCyan = lipgloss.Color("#FF8800")
+
+	RootDimmedLime = lipgloss.Color("#8F1100")
+	RootDimmedPink = lipgloss.Color("#8F0011")
+	RootDimmedCyan = lipgloss.Color("#8F4400")
 )
 
 var Dimmed = false
 
 func Primary() lipgloss.Color {
+	if IsRoot {
+		if Dimmed {
+			return RootDimmedLime
+		}
+		return RootLime
+	}
 	if Dimmed {
 		return DimmedLime
 	}
@@ -43,6 +66,12 @@ func Primary() lipgloss.Color {
 }
 
 func Secondary() lipgloss.Color {
+	if IsRoot {
+		if Dimmed {
+			return RootDimmedPink
+		}
+		return RootPink
+	}
 	if Dimmed {
 		return DimmedPink
 	}
@@ -50,6 +79,12 @@ func Secondary() lipgloss.Color {
 }
 
 func Tertiary() lipgloss.Color {
+	if IsRoot {
+		if Dimmed {
+			return RootDimmedCyan
+		}
+		return RootCyan
+	}
 	if Dimmed {
 		return DimmedCyan
 	}

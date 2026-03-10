@@ -2,8 +2,8 @@ package components
 
 import (
 	"fmt"
+	"os"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/blumenwagen/durandal/internal/metrics"
@@ -27,9 +27,10 @@ type Processes struct {
 	filterTerm  string
 
 	// Kill state
-	KillConfirm bool   // waiting for Y/N confirmation
-	KillResult  string // status message after attempt
-	KillTime    time.Time
+	KillConfirm    bool   // waiting for Y/N confirmation
+	KillErrorPopup string // status message for permission denied popup
+	KillResult     string // status message after attempt
+	KillTime       time.Time
 }
 
 func NewProcesses() Processes {
@@ -111,6 +112,11 @@ func (p *Processes) RequestKill() {
 	if p.Cursor < 0 || p.Cursor >= len(p.List) {
 		return
 	}
+	proc := p.List[p.Cursor]
+	if proc.User == "root" && !styles.IsRoot {
+		p.KillErrorPopup = fmt.Sprintf("Cannot kill root process %d (%s) as non-root user", proc.PID, proc.Name)
+		return
+	}
 	p.KillConfirm = true
 	p.KillResult = ""
 }
@@ -121,11 +127,17 @@ func (p *Processes) ConfirmKill() {
 		return
 	}
 	proc := p.List[p.Cursor]
-	err := syscall.Kill(int(proc.PID), syscall.SIGTERM)
+
+	// Use os-level process handling for cross-platform compat
+	osProc, err := os.FindProcess(int(proc.PID))
+	if err == nil {
+		err = osProc.Kill()
+	}
+
 	if err != nil {
 		p.KillResult = fmt.Sprintf("✗ kill %d (%s): %v", proc.PID, proc.Name, err)
 	} else {
-		p.KillResult = fmt.Sprintf("✓ SIGTERM → %d (%s)", proc.PID, proc.Name)
+		p.KillResult = fmt.Sprintf("✓ KILL → %d (%s)", proc.PID, proc.Name)
 	}
 	p.KillTime = time.Now()
 	p.KillConfirm = false
@@ -133,9 +145,19 @@ func (p *Processes) ConfirmKill() {
 
 func (p *Processes) CancelKill() {
 	p.KillConfirm = false
+	p.KillErrorPopup = ""
 }
 
 func (p Processes) View() string {
+	if p.KillErrorPopup != "" {
+		popup := lipgloss.NewStyle().Foreground(styles.Red).Bold(true).Render("PERMISSION DENIED") + "\n\n" +
+			lipgloss.NewStyle().Foreground(styles.BrightWht).Render(p.KillErrorPopup) + "\n\n" +
+			styles.Dim("[Press Esc or Enter to close]")
+
+		content := lipgloss.Place(p.Width-2, p.Height-2, lipgloss.Center, lipgloss.Center, popup)
+		return styles.Panel("ERROR", content, p.Width, p.Height)
+	}
+
 	iw := p.Width - 2
 	if iw < 20 {
 		iw = 20
