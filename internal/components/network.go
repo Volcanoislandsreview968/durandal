@@ -81,5 +81,5 @@ func (n Network) View() string {
 		styles.Dim("  tot:"+styles.FormatBytes(n.Info.BytesSent)))
 	lines = append(lines, strings.Split(styles.MultiSparkline(n.SendHistory, iw, sparkH, styles.Secondary()), "\n")...)
 
-	return styles.Panel("NET", strings.Join(lines, "\n"), n.Width, n.Height)
+	return styles.TechPanel("NETWORK", strings.Join(lines, "\n"), n.Width, n.Height, styles.HotPink)
 }

@@ -99,5 +99,5 @@ func (m Memory) View() string {
 		lines = append(lines, styles.Dim("BAT ")+icon+" "+pctStr)
 	}
 
-	return styles.Panel("MEM", strings.Join(lines, "\n"), m.Width, m.Height)
+	return styles.TechPanel("MEMORY", strings.Join(lines, "\n"), m.Width, m.Height, styles.Cyan)
 }

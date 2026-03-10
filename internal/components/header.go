@@ -38,49 +38,46 @@ type Header struct {
 
 func NewHeader() Header { return Header{} }
 
+func (h *Header) Update(host metrics.HostInfo) {
+	h.Host = host
+}
+
 func (h Header) View() string {
-	if h.Width < 30 {
+	if h.Width <= 0 {
 		return ""
 	}
-	w := h.Width
 
-	// Glitched texts
-	durandalTxt := glitchString(" DURANDAL ", 0.08, 3)
-	sysMonTxt := glitchString("SYSTEM MONITOR", 0.03, 2)
+	left := lipgloss.NewStyle().Foreground(styles.NeonLime).Bold(true).Render(styles.TextTracking("D U R A N D A L "))
+	left += lipgloss.NewStyle().Foreground(styles.BrightWht).Render(" /// S Y S T E M S")
 
-	// Left: title
-	title := styles.Accent(glitchString("《", 0.01, 1)) +
-		styles.Bright(durandalTxt) +
-		styles.Accent(glitchString("》", 0.01, 1)) +
-		" " + styles.Teal(sysMonTxt)
-
-	// Right: system info
-	host := styles.Bright(glitchString(h.Host.Hostname, 0.02, 2))
-	kern := styles.Dim(h.Host.Kernel)
-	up := styles.Pink("▲ " + glitchString(h.Host.Uptime, 0.02, 1))
-
-	dimTag := ""
-	if styles.Dimmed {
-		dimTag = styles.Dim(" [DIM]")
+	// We safely extract username from host object
+	username := h.Host.User
+	if username == "" {
+		username = "system"
 	}
 
-	right := host + " " + kern + " " + up + dimTag
+	right := styles.Dim("USER: ") + lipgloss.NewStyle().Foreground(styles.Primary()).Render(username)
+	if h.Host.Hostname != "" {
+		right += styles.Dim(" @ ") + styles.Bright(h.Host.Hostname)
+	}
 
-	// Fill gap between left and right
-	titleW := lipgloss.Width(title)
+	// Uptime is pre-formatted as string inside metrics.HostInfo
+	right += styles.Dim(" // UPTIME: ") + styles.Accent(h.Host.Uptime)
+
+	leftW := lipgloss.Width(left)
 	rightW := lipgloss.Width(right)
-	gap := w - titleW - rightW - 2
-	if gap < 1 {
-		gap = 1
+
+	fillAmt := h.Width - leftW - rightW
+	if fillAmt < 0 {
+		fillAmt = 0
 	}
 
-	fill := styles.Dim(strings.Repeat("─", gap))
-	// apply occasional heavy glitch to the scanline itself
-	if rand.Float64() < 0.05 {
-		fill = styles.Dim(glitchString(strings.Repeat("─", gap), 1.0, gap/4))
-	}
-
-	return title + " " + fill + " " + right
+	// ▛▀▀▀▀▀▀▀   ▀▀▀▀▀▀▀▜
+	// ▌ DURANDAL ...    ▐
+	// ▙▄▄▄▄▄▄▄   ▄▄▄▄▄▄▄▟
+	// Instead of a full TechPanel, the header is just a structured bar
+	barText := left + strings.Repeat(" ", fillAmt) + right
+	return lipgloss.NewStyle().Background(styles.DarkNavy).Render(barText)
 }
 
 // HelpBar renders the bottom keybinding reference bar.

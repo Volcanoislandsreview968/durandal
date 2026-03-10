@@ -66,5 +66,5 @@ func (g GPU) View() string {
 		}
 	}
 
-	return styles.Panel("GPU", strings.Join(lines, "\n"), g.Width, g.Height)
+	return styles.TechPanel("GPU ACCELERATOR", strings.Join(lines, "\n"), g.Width, g.Height, styles.NeonLime)
 }

@@ -93,7 +93,7 @@ func Tertiary() lipgloss.Color {
 
 // ── Panel Rendering ─────────────────────────────────────────────────────────
 
-func Panel(title string, content string, width, height int) string {
+func TechPanel(title string, content string, width, height int, accent lipgloss.Color) string {
 	innerW := width - 2
 	if innerW < 1 {
 		innerW = 1
@@ -103,54 +103,87 @@ func Panel(title string, content string, width, height int) string {
 		innerH = 1
 	}
 
-	topBorder := buildTopBorder(title, innerW)
+	topBorder := buildSciFiBorder(title, innerW, accent)
 	contentLines := strings.Split(content, "\n")
 
 	var body strings.Builder
+
+	// Create rigid vertical side borders that match the accent color
+	borderStyle := lipgloss.NewStyle().Foreground(accent)
+
 	for i := 0; i < innerH; i++ {
 		line := ""
 		if i < len(contentLines) {
 			line = contentLines[i]
 		}
-		lineW := lipgloss.Width(line)
-		if lineW > innerW {
-			line = truncateToWidth(line, innerW)
+
+		// We add a literal space margin inside the text area for breathability
+		paddedLine := " " + line
+		lineW := lipgloss.Width(paddedLine)
+
+		if lineW > innerW-1 { // -1 to preserve right margin space
+			paddedLine = truncateToWidth(paddedLine, innerW-1) + " "
 		} else if lineW < innerW {
-			line = line + strings.Repeat(" ", innerW-lineW)
+			paddedLine = paddedLine + strings.Repeat(" ", innerW-lineW)
 		}
 
-		borderChar := lipgloss.NewStyle().Foreground(MutedGrey).Render("│")
-		body.WriteString(borderChar + line + borderChar + "\n")
+		borderChar := borderStyle.Render("▌")
+		body.WriteString(borderChar + paddedLine + borderStyle.Render("▐") + "\n")
 	}
 
-	bottomBorder := lipgloss.NewStyle().Foreground(MutedGrey).Render(
-		"└" + strings.Repeat("─", innerW) + "┘")
+	bottomBorder := borderStyle.Render("▙" + strings.Repeat("▄", innerW) + "▟")
 
 	return topBorder + "\n" + body.String() + bottomBorder
 }
 
-func buildTopBorder(title string, innerW int) string {
+func buildSciFiBorder(title string, innerW int, accent lipgloss.Color) string {
+	accentStyle := lipgloss.NewStyle().Foreground(accent)
+
 	if title == "" {
-		return lipgloss.NewStyle().Foreground(Tertiary()).Render(
-			"┌" + strings.Repeat("─", innerW) + "┐")
+		return accentStyle.Render("▛" + strings.Repeat("▀", innerW) + "▜")
 	}
 
-	titleRendered := lipgloss.NewStyle().Foreground(Primary()).Bold(true).Render("┤") +
-		lipgloss.NewStyle().Foreground(BrightWht).Bold(true).Render(" "+title+" ") +
-		lipgloss.NewStyle().Foreground(Primary()).Bold(true).Render("├")
+	// ▛▀▀ [ T I T L E ] ▀▀▀▀▀▀▀▀▀▀ /// ▀▀▜
+	trackedTitle := TextTracking(strings.ToUpper(title))
 
-	titleVisualWidth := lipgloss.Width(titleRendered)
+	titleBracketL := lipgloss.NewStyle().Foreground(BrightWht).Bold(true).Render("[ ")
+	titleText := lipgloss.NewStyle().Foreground(DeepBlack).Background(accent).Bold(true).Render(trackedTitle)
+	titleBracketR := lipgloss.NewStyle().Foreground(BrightWht).Bold(true).Render(" ]")
 
-	leftDash := 1
-	rightDash := innerW - titleVisualWidth - leftDash
-	if rightDash < 0 {
-		rightDash = 0
+	// Assembly the title portion
+	fullTitle := titleBracketL + titleText + titleBracketR
+	titleVisualWidth := lipgloss.Width(fullTitle)
+
+	leftDashCount := 2
+
+	// Calculate the remaining space on the right side
+	rightDashCount := innerW - titleVisualWidth - leftDashCount
+	rightSide := ""
+
+	if rightDashCount >= 7 {
+		// Embed the visual /// decor directly into the structural border
+		mainDashCount := rightDashCount - 6
+		rightSide = accentStyle.Render(strings.Repeat("▀", mainDashCount)) +
+			lipgloss.NewStyle().Foreground(BrightWht).Bold(true).Render(" /// ") +
+			accentStyle.Render("▀▜")
+	} else if rightDashCount >= 0 {
+		rightSide = accentStyle.Render(strings.Repeat("▀", rightDashCount) + "▜")
 	}
 
-	left := lipgloss.NewStyle().Foreground(Tertiary()).Render("┌" + strings.Repeat("─", leftDash))
-	right := lipgloss.NewStyle().Foreground(Tertiary()).Render(strings.Repeat("─", rightDash) + "┐")
+	left := accentStyle.Render("▛" + strings.Repeat("▀", leftDashCount))
 
-	return left + titleRendered + right
+	return left + fullTitle + rightSide
+}
+
+func TextTracking(s string) string {
+	res := ""
+	for i, c := range s {
+		res += string(c)
+		if i < len(s)-1 {
+			res += " "
+		}
+	}
+	return res
 }
 
 // ── Bar Rendering ───────────────────────────────────────────────────────────

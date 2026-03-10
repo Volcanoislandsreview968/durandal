@@ -15,6 +15,7 @@ type Snapshot struct {
 // HostInfo contains system identity data.
 type HostInfo struct {
 	Hostname     string
+	User         string
 	Kernel       string
 	Uptime       string
 	OS           string

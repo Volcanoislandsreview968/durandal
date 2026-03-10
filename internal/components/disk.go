@@ -55,5 +55,5 @@ func (d Disk) View() string {
 		lines = append(lines, styles.GradientBar(disk.UsedPercent, barW))
 	}
 
-	return styles.Panel("DISK", strings.Join(lines, "\n"), d.Width, d.Height)
+	return styles.TechPanel("STORAGE", strings.Join(lines, "\n"), d.Width, d.Height, styles.Amber)
 }

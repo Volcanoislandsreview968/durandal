@@ -80,6 +80,14 @@ func collectHost() HostInfo {
 		info.Hostname, _ = os.Hostname()
 	}
 
+	importUser, err := os.UserHomeDir()
+	if err == nil {
+		parts := strings.Split(importUser, "/")
+		if len(parts) > 0 {
+			info.User = parts[len(parts)-1]
+		}
+	}
+
 	return info
 }
 

@@ -155,10 +155,10 @@ func (p Processes) View() string {
 			styles.Dim("[Press Esc or Enter to close]")
 
 		content := lipgloss.Place(p.Width-2, p.Height-2, lipgloss.Center, lipgloss.Center, popup)
-		return styles.Panel("ERROR", content, p.Width, p.Height)
+		return styles.TechPanel("ERROR", content, p.Width, p.Height, styles.Red)
 	}
 
-	iw := p.Width - 2
+	iw := p.Width - 4
 	if iw < 20 {
 		iw = 20
 	}
@@ -171,10 +171,10 @@ func (p Processes) View() string {
 		sortStr = styles.Pink("MEM▼")
 	}
 
-	statusText := styles.Dim("sort:") + sortStr + styles.Dim(fmt.Sprintf("  %d procs", len(p.List)))
+	statusText := styles.Dim(" SORT:") + sortStr + styles.Dim(fmt.Sprintf("  %d PROCS", len(p.List)))
 
 	if p.filterTerm != "" && !p.IsFiltering {
-		statusText += styles.Dim("  filter:") + styles.Teal("/"+p.filterTerm)
+		statusText += styles.Dim("  FILTER:") + styles.Teal("/"+p.filterTerm)
 	}
 
 	// Status Line: Kill confirm OR filter bar OR standard sort
@@ -183,25 +183,26 @@ func (p Processes) View() string {
 	if p.KillConfirm && p.Cursor >= 0 && p.Cursor < len(p.List) {
 		proc := p.List[p.Cursor]
 		statusLine = styles.Crit(fmt.Sprintf("  KILL %d (%s)? ", proc.PID, proc.Name)) +
-			styles.Accent("[y]") + styles.Dim("es ") +
-			styles.Accent("[n]") + styles.Dim("o")
+			styles.Accent("[Y]") + styles.Dim("ES ") +
+			styles.Accent("[N]") + styles.Dim("O")
 	} else if p.KillResult != "" {
 		if strings.HasPrefix(p.KillResult, "✓") {
-			statusLine = styles.Accent(p.KillResult)
+			statusLine = "  " + styles.Accent(p.KillResult)
 		} else {
-			statusLine = styles.Crit(p.KillResult)
+			statusLine = "  " + styles.Crit(p.KillResult)
 		}
 	} else if p.IsFiltering {
 		statusLine = p.FilterInput.View()
 	}
 
-	lines = append(lines, statusLine)
+	lines = append(lines, " "+statusLine)
+	lines = append(lines, "")
 
-	// Table header
+	// Table header - solid block
 	hdr := fmtProcRow("PID", "COMMAND", "CPU%", "MEM%", "RSS", "USER", iw)
-	lines = append(lines, lipgloss.NewStyle().Foreground(styles.Tertiary()).Bold(true).Render(hdr))
+	lines = append(lines, " "+lipgloss.NewStyle().Foreground(styles.DeepBlack).Background(styles.MutedGrey).Bold(true).Render(hdr))
 
-	visibleRows := p.Height - 4
+	visibleRows := p.Height - 5
 	if visibleRows < 1 {
 		visibleRows = 1
 	}
@@ -234,7 +235,7 @@ func (p Processes) View() string {
 		)
 
 		if isSelected {
-			bg := styles.Primary()
+			bg := styles.NeonLime
 			if p.KillConfirm {
 				bg = styles.Red
 			}
@@ -247,10 +248,10 @@ func (p Processes) View() string {
 			row = lipgloss.NewStyle().Foreground(styles.OffWhite).Render(row)
 		}
 
-		lines = append(lines, row)
+		lines = append(lines, " "+row)
 	}
 
-	return styles.Panel("PROCESSES", strings.Join(lines, "\n"), p.Width, p.Height)
+	return styles.TechPanel("PROCESS ARCHIVE", strings.Join(lines, "\n"), p.Width, p.Height, styles.Primary())
 }
 
 func fmtProcRow(pid, name, cpu, mem, rss, user string, maxW int) string {

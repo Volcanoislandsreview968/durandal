@@ -55,7 +55,7 @@ func (c CPU) View() string {
 	coreCount := len(c.Info.PerCore)
 	if coreCount == 0 {
 		lines = append(lines, styles.Sparkline(c.History, iw, styles.Primary()))
-		return styles.Panel("CPU", strings.Join(lines, "\n"), c.Width, c.Height)
+		return styles.TechPanel("CPU", strings.Join(lines, "\n"), c.Width, c.Height, styles.NeonLime)
 	}
 
 	maxCoreRows := (coreCount + 1) / 2
@@ -119,5 +119,5 @@ func (c CPU) View() string {
 		}
 	}
 
-	return styles.Panel("CPU", strings.Join(lines, "\n"), c.Width, c.Height)
+	return styles.TechPanel("CPU", strings.Join(lines, "\n"), c.Width, c.Height, styles.NeonLime)
 }
