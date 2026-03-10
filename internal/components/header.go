@@ -1,11 +1,31 @@
 package components
 
 import (
+	"math/rand"
 	"strings"
 
 	"github.com/blumenwagen/durandal/internal/metrics"
 	"github.com/blumenwagen/durandal/internal/styles"
+	"github.com/charmbracelet/lipgloss"
 )
+
+func glitchString(s string, chance float64, intensity int) string {
+	if rand.Float64() > chance {
+		return s
+	}
+	chars := []rune(s)
+	if len(chars) == 0 {
+		return s
+	}
+	numGlitches := rand.Intn(intensity) + 1
+	glitchChars := []rune("█▓▒░×÷±#@_/")
+	for i := 0; i < numGlitches; i++ {
+		idx := rand.Intn(len(chars))
+		gIdx := rand.Intn(len(glitchChars))
+		chars[idx] = glitchChars[gIdx]
+	}
+	return string(chars)
+}
 
 // Header renders the top HUD bar — no border box, just a single styled line.
 type Header struct {
@@ -21,16 +41,20 @@ func (h Header) View() string {
 	}
 	w := h.Width
 
+	// Glitched texts
+	durandalTxt := glitchString(" DURANDAL ", 0.08, 3)
+	sysMonTxt := glitchString("SYSTEM MONITOR", 0.03, 2)
+
 	// Left: title
-	title := styles.Accent("《") +
-		styles.Bright(" DURANDAL ") +
-		styles.Accent("》") +
-		" " + styles.Teal("SYSTEM MONITOR")
+	title := styles.Accent(glitchString("《", 0.01, 1)) +
+		styles.Bright(durandalTxt) +
+		styles.Accent(glitchString("》", 0.01, 1)) +
+		" " + styles.Teal(sysMonTxt)
 
 	// Right: system info
-	host := styles.Bright(h.Host.Hostname)
+	host := styles.Bright(glitchString(h.Host.Hostname, 0.02, 2))
 	kern := styles.Dim(h.Host.Kernel)
-	up := styles.Pink("▲ " + h.Host.Uptime)
+	up := styles.Pink("▲ " + glitchString(h.Host.Uptime, 0.02, 1))
 
 	dimTag := ""
 	if styles.Dimmed {
@@ -40,14 +64,18 @@ func (h Header) View() string {
 	right := host + " " + kern + " " + up + dimTag
 
 	// Fill gap between left and right
-	titleW := lipglossWidth(title)
-	rightW := lipglossWidth(right)
+	titleW := lipgloss.Width(title)
+	rightW := lipgloss.Width(right)
 	gap := w - titleW - rightW - 2
 	if gap < 1 {
 		gap = 1
 	}
 
 	fill := styles.Dim(strings.Repeat("─", gap))
+	// apply occasional heavy glitch to the scanline itself
+	if rand.Float64() < 0.05 {
+		fill = styles.Dim(glitchString(strings.Repeat("─", gap), 1.0, gap/4))
+	}
 
 	return title + " " + fill + " " + right
 }
@@ -58,6 +86,8 @@ func HelpBar(w int, dimmed bool) string {
 		{"↑/k", "up"},
 		{"↓/j", "down"},
 		{"s", "sort"},
+		{"/", "search"},
+		{"⏎", "inspect"},
 		{"K", "kill"},
 		{"d", "dim"},
 		{"q", "quit"},
@@ -69,7 +99,7 @@ func HelpBar(w int, dimmed bool) string {
 	}
 	bar := strings.Join(parts, styles.Dim("  │  "))
 
-	barW := lipglossWidth(bar)
+	barW := lipgloss.Width(bar)
 	if barW >= w {
 		return bar
 	}
@@ -77,25 +107,4 @@ func HelpBar(w int, dimmed bool) string {
 	// Center the bar
 	pad := (w - barW) / 2
 	return strings.Repeat(" ", pad) + bar
-}
-
-// lipglossWidth is a helper to avoid importing lipgloss everywhere
-func lipglossWidth(s string) int {
-	// Count visible width — iterate runes, skip ANSI escapes
-	w := 0
-	inEscape := false
-	for _, r := range s {
-		if r == '\033' {
-			inEscape = true
-			continue
-		}
-		if inEscape {
-			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
-				inEscape = false
-			}
-			continue
-		}
-		w++
-	}
-	return w
 }

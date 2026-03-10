@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/blumenwagen/durandal/internal/metrics"
 	"github.com/blumenwagen/durandal/internal/styles"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -18,45 +20,119 @@ type Processes struct {
 	Cursor    int
 	SortByCPU bool
 	Offset    int
+
+	// Search state
+	FilterInput textinput.Model
+	IsFiltering bool
+	filterTerm  string
+
+	// Kill state
+	KillConfirm bool   // waiting for Y/N confirmation
+	KillResult  string // status message after attempt
+	KillTime    time.Time
 }
 
 func NewProcesses() Processes {
-	return Processes{SortByCPU: true}
+	ti := textinput.New()
+	ti.Placeholder = "Process name or PID..."
+	ti.Prompt = "/"
+	ti.PromptStyle = lipgloss.NewStyle().Foreground(styles.Tertiary()).Bold(true)
+	ti.TextStyle = lipgloss.NewStyle().Foreground(styles.BrightWht)
+
+	return Processes{
+		SortByCPU:   true,
+		FilterInput: ti,
+	}
 }
 
 func (p *Processes) Update(procs []metrics.ProcessInfo) {
-	p.List = procs
+	// Apply filter
+	var filtered []metrics.ProcessInfo
+	term := strings.ToLower(p.filterTerm)
+
+	if term == "" {
+		filtered = procs
+	} else {
+		for _, pr := range procs {
+			if strings.Contains(strings.ToLower(pr.Name), term) ||
+				strings.Contains(strings.ToLower(pr.Command), term) ||
+				strings.Contains(fmt.Sprintf("%d", pr.PID), term) {
+				filtered = append(filtered, pr)
+			}
+		}
+	}
+
+	p.List = filtered
 	if p.Cursor >= len(p.List) {
 		p.Cursor = len(p.List) - 1
 	}
 	if p.Cursor < 0 {
 		p.Cursor = 0
 	}
+
+	if p.KillResult != "" && time.Since(p.KillTime) > 3*time.Second {
+		p.KillResult = ""
+	}
+}
+
+func (p *Processes) SetFilter(term string) {
+	p.filterTerm = term
+	// Re-applying filter immediately isn't deeply necessary because snapshotMsg ticks every second,
+	// but it makes UI snappier to at least reset cursor
+	p.Cursor = 0
 }
 
 func (p *Processes) ScrollUp() {
+	if p.KillConfirm {
+		return
+	}
 	if p.Cursor > 0 {
 		p.Cursor--
 	}
 }
 
 func (p *Processes) ScrollDown() {
+	if p.KillConfirm {
+		return
+	}
 	if p.Cursor < len(p.List)-1 {
 		p.Cursor++
 	}
 }
 
 func (p *Processes) ToggleSort() {
+	if p.KillConfirm {
+		return
+	}
 	p.SortByCPU = !p.SortByCPU
 }
 
-// KillSelected sends SIGTERM to the selected process.
-func (p *Processes) KillSelected() error {
+func (p *Processes) RequestKill() {
 	if p.Cursor < 0 || p.Cursor >= len(p.List) {
-		return nil
+		return
 	}
-	pid := p.List[p.Cursor].PID
-	return syscall.Kill(int(pid), syscall.SIGTERM)
+	p.KillConfirm = true
+	p.KillResult = ""
+}
+
+func (p *Processes) ConfirmKill() {
+	if !p.KillConfirm || p.Cursor < 0 || p.Cursor >= len(p.List) {
+		p.KillConfirm = false
+		return
+	}
+	proc := p.List[p.Cursor]
+	err := syscall.Kill(int(proc.PID), syscall.SIGTERM)
+	if err != nil {
+		p.KillResult = fmt.Sprintf("✗ kill %d (%s): %v", proc.PID, proc.Name, err)
+	} else {
+		p.KillResult = fmt.Sprintf("✓ SIGTERM → %d (%s)", proc.PID, proc.Name)
+	}
+	p.KillTime = time.Now()
+	p.KillConfirm = false
+}
+
+func (p *Processes) CancelKill() {
+	p.KillConfirm = false
 }
 
 func (p Processes) View() string {
@@ -72,23 +148,42 @@ func (p Processes) View() string {
 	if !p.SortByCPU {
 		sortStr = styles.Pink("MEM▼")
 	}
-	lines = append(lines, styles.Dim("sort:")+sortStr+
-		styles.Dim(fmt.Sprintf("  %d procs", len(p.List))))
+
+	statusText := styles.Dim("sort:") + sortStr + styles.Dim(fmt.Sprintf("  %d procs", len(p.List)))
+
+	if p.filterTerm != "" && !p.IsFiltering {
+		statusText += styles.Dim("  filter:") + styles.Teal("/"+p.filterTerm)
+	}
+
+	// Status Line: Kill confirm OR filter bar OR standard sort
+	statusLine := statusText
+
+	if p.KillConfirm && p.Cursor >= 0 && p.Cursor < len(p.List) {
+		proc := p.List[p.Cursor]
+		statusLine = styles.Crit(fmt.Sprintf("  KILL %d (%s)? ", proc.PID, proc.Name)) +
+			styles.Accent("[y]") + styles.Dim("es ") +
+			styles.Accent("[n]") + styles.Dim("o")
+	} else if p.KillResult != "" {
+		if strings.HasPrefix(p.KillResult, "✓") {
+			statusLine = styles.Accent(p.KillResult)
+		} else {
+			statusLine = styles.Crit(p.KillResult)
+		}
+	} else if p.IsFiltering {
+		statusLine = p.FilterInput.View()
+	}
+
+	lines = append(lines, statusLine)
 
 	// Table header
-	hdr := fmtProcRow("PID", "NAME", "CPU%", "MEM%", "RSS", "USER", iw)
-	lines = append(lines, lipgloss.NewStyle().
-		Foreground(styles.Tertiary()).
-		Bold(true).
-		Render(hdr))
+	hdr := fmtProcRow("PID", "COMMAND", "CPU%", "MEM%", "RSS", "USER", iw)
+	lines = append(lines, lipgloss.NewStyle().Foreground(styles.Tertiary()).Bold(true).Render(hdr))
 
-	// Visible rows
-	visibleRows := p.Height - 4 // title border + header + sort + bottom border
+	visibleRows := p.Height - 4
 	if visibleRows < 1 {
 		visibleRows = 1
 	}
 
-	// Keep cursor in view
 	if p.Cursor < p.Offset {
 		p.Offset = p.Cursor
 	}
@@ -100,31 +195,28 @@ func (p Processes) View() string {
 		proc := p.List[i]
 		isSelected := i == p.Cursor
 
-		name := proc.Name
-		if len(name) > 15 {
-			name = name[:12] + "…"
-		}
 		user := proc.User
 		if len(user) > 8 {
 			user = user[:8]
 		}
 
+		cmd := proc.Command
+		if cmd == "" {
+			cmd = proc.Name
+		}
+
 		row := fmtProcRow(
-			fmt.Sprintf("%d", proc.PID),
-			name,
-			fmt.Sprintf("%.1f", proc.CPU),
-			fmt.Sprintf("%.1f", proc.Memory),
-			styles.FormatBytes(proc.MemRSS),
-			user,
-			iw,
+			fmt.Sprintf("%d", proc.PID), cmd,
+			fmt.Sprintf("%.1f", proc.CPU), fmt.Sprintf("%.1f", proc.Memory),
+			styles.FormatBytes(proc.MemRSS), user, iw,
 		)
 
 		if isSelected {
-			row = lipgloss.NewStyle().
-				Foreground(styles.DeepBlack).
-				Background(styles.Primary()).
-				Bold(true).
-				Render(row)
+			bg := styles.Primary()
+			if p.KillConfirm {
+				bg = styles.Red
+			}
+			row = lipgloss.NewStyle().Foreground(styles.DeepBlack).Background(bg).Bold(true).Render(row)
 		} else if proc.CPU > 50 {
 			row = lipgloss.NewStyle().Foreground(styles.Secondary()).Render(row)
 		} else if proc.CPU > 20 {
@@ -140,7 +232,20 @@ func (p Processes) View() string {
 }
 
 func fmtProcRow(pid, name, cpu, mem, rss, user string, maxW int) string {
-	s := fmt.Sprintf(" %-7s %-15s %6s %6s %8s %-8s", pid, name, cpu, mem, rss, user)
+	fixedW := 41
+	nameW := maxW - fixedW
+	if nameW < 5 {
+		nameW = 5
+	}
+
+	dispName := name
+	if len(dispName) > nameW {
+		dispName = dispName[:nameW-1] + "…"
+	} else if len(dispName) < nameW {
+		dispName = dispName + strings.Repeat(" ", nameW-len(dispName))
+	}
+
+	s := fmt.Sprintf(" %-7s %s %6s %6s %8s %-8s", pid, dispName, cpu, mem, rss, user)
 	if len(s) > maxW {
 		s = s[:maxW]
 	}

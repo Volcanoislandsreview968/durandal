@@ -7,6 +7,7 @@ type Snapshot struct {
 	Processes []ProcessInfo
 	Network   NetworkInfo
 	Disks     []DiskInfo
+	GPUs      []GPUInfo
 	Sensors   SensorInfo
 	Host      HostInfo
 }
@@ -88,4 +89,13 @@ type BatteryInfo struct {
 	Percent    float64
 	IsCharging bool
 	TimeLeft   string
+}
+
+// GPUInfo contains NVIDIA GPU metrics.
+type GPUInfo struct {
+	Name        string
+	Utilization float64 // Percent
+	MemoryUsed  uint64  // MB
+	MemoryTotal uint64  // MB
+	Temperature float64 // Celsius
 }

@@ -8,7 +8,6 @@ import (
 )
 
 // ── Marathon Color Palette ──────────────────────────────────────────────────
-// "Graphic Retro Futurism" — Y2K Cyberpunk × The Designers Republic
 
 var (
 	NeonLime  = lipgloss.Color("#BFFF00")
@@ -18,24 +17,22 @@ var (
 	DarkNavy  = lipgloss.Color("#12121F")
 	Charcoal  = lipgloss.Color("#1A1A2E")
 	MutedGrey = lipgloss.Color("#3E3E50")
-	DimGrey   = lipgloss.Color("#2A2A3A")
+	DimGrey   = lipgloss.Color("#1F1F2E")
 	OffWhite  = lipgloss.Color("#D8D8E8")
 	BrightWht = lipgloss.Color("#FFFFFF")
 	Amber     = lipgloss.Color("#FFB800")
 	Red       = lipgloss.Color("#FF2244")
-	DimCyan   = lipgloss.Color("#0A3F3F")
+	DimCyan   = lipgloss.Color("#053333")
 	DimLime   = lipgloss.Color("#1A2A00")
 	DimPink   = lipgloss.Color("#2A0015")
 )
 
-// Dimmed mode variants
 var (
 	DimmedLime = lipgloss.Color("#6F8F00")
 	DimmedPink = lipgloss.Color("#8F003F")
 	DimmedCyan = lipgloss.Color("#007F8F")
 )
 
-// Dimmed toggles the color intensity
 var Dimmed = false
 
 func Primary() lipgloss.Color {
@@ -61,22 +58,17 @@ func Tertiary() lipgloss.Color {
 
 // ── Panel Rendering ─────────────────────────────────────────────────────────
 
-// Panel renders content inside a Marathon-style bordered box.
-// The width/height are the OUTER dimensions including the border.
 func Panel(title string, content string, width, height int) string {
-	innerW := width - 2 // left + right border chars
+	innerW := width - 2
 	if innerW < 1 {
 		innerW = 1
 	}
-	innerH := height - 2 // top + bottom border lines
+	innerH := height - 2
 	if innerH < 1 {
 		innerH = 1
 	}
 
-	// Build top border with title
 	topBorder := buildTopBorder(title, innerW)
-
-	// Build content area — pad or truncate to exact innerH lines
 	contentLines := strings.Split(content, "\n")
 
 	var body strings.Builder
@@ -85,11 +77,8 @@ func Panel(title string, content string, width, height int) string {
 		if i < len(contentLines) {
 			line = contentLines[i]
 		}
-
-		// Trim or pad to exact width
 		lineW := lipgloss.Width(line)
 		if lineW > innerW {
-			// Truncate — find a safe cut point
 			line = truncateToWidth(line, innerW)
 		} else if lineW < innerW {
 			line = line + strings.Repeat(" ", innerW-lineW)
@@ -99,7 +88,6 @@ func Panel(title string, content string, width, height int) string {
 		body.WriteString(borderChar + line + borderChar + "\n")
 	}
 
-	// Bottom border
 	bottomBorder := lipgloss.NewStyle().Foreground(MutedGrey).Render(
 		"└" + strings.Repeat("─", innerW) + "┘")
 
@@ -130,28 +118,14 @@ func buildTopBorder(title string, innerW int) string {
 	return left + titleRendered + right
 }
 
-// truncateToWidth cuts a string to fit within a visual width.
-func truncateToWidth(s string, maxW int) string {
-	if maxW <= 0 {
-		return ""
-	}
-	runes := []rune(s)
-	// Simple byte-level truncation — good enough for monospace
-	for len(runes) > 0 && lipgloss.Width(string(runes)) > maxW {
-		runes = runes[:len(runes)-1]
-	}
-	return string(runes)
-}
-
 // ── Bar Rendering ───────────────────────────────────────────────────────────
 
-// Bar draws a compact horizontal usage bar with percentage.
 func Bar(percent float64, width int, fg lipgloss.Color) string {
 	if width < 6 {
 		return fmt.Sprintf("%3.0f%%", percent)
 	}
 
-	barW := width - 5 // " 100%"
+	barW := width - 5
 	if barW < 1 {
 		barW = 1
 	}
@@ -165,20 +139,22 @@ func Bar(percent float64, width int, fg lipgloss.Color) string {
 	}
 	empty := barW - filled
 
-	bar := lipgloss.NewStyle().Foreground(fg).Render(strings.Repeat("█", filled)) +
-		lipgloss.NewStyle().Foreground(DimGrey).Render(strings.Repeat("░", empty))
+	// visually richer blocks
+	filledStr := strings.Repeat("█", filled)
+	emptyStr := strings.Repeat("⡀", empty) // subtle dot/line instead of heavy block for empty
+
+	bar := lipgloss.NewStyle().Foreground(fg).Render(filledStr) +
+		lipgloss.NewStyle().Foreground(DimGrey).Render(emptyStr)
 
 	pct := lipgloss.NewStyle().Foreground(OffWhite).Bold(true).Render(fmt.Sprintf(" %3.0f%%", percent))
 
 	return bar + pct
 }
 
-// GradientBar renders a bar that changes color based on value.
 func GradientBar(percent float64, width int) string {
 	return Bar(percent, width, UsageColor(percent))
 }
 
-// UsageColor picks a color based on utilization thresholds
 func UsageColor(pct float64) lipgloss.Color {
 	switch {
 	case pct >= 90:
@@ -194,40 +170,62 @@ func UsageColor(pct float64) lipgloss.Color {
 
 // ── Sparkline ───────────────────────────────────────────────────────────────
 
-var sparkChars = []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
+var sparkChars = []rune{' ', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
 
 func Sparkline(values []float64, width int, color lipgloss.Color) string {
-	if width <= 0 {
+	return MultiSparkline(values, width, 1, color)
+}
+
+func MultiSparkline(values []float64, width, height int, color lipgloss.Color) string {
+	if width <= 0 || height <= 0 {
 		return ""
 	}
 
-	// Take last `width` values
 	start := 0
 	if len(values) > width {
 		start = len(values) - width
 	}
 	visible := values[start:]
 
-	var sb strings.Builder
-	for _, v := range visible {
-		if v < 0 {
-			v = 0
-		}
-		if v > 100 {
-			v = 100
-		}
-		idx := int(v / 100.0 * float64(len(sparkChars)-1))
-		if idx >= len(sparkChars) {
-			idx = len(sparkChars) - 1
-		}
-		sb.WriteRune(sparkChars[idx])
-	}
-	// Pad
-	for i := len(visible); i < width; i++ {
-		sb.WriteRune(' ')
+	// Pad with zeros to fill width
+	data := make([]float64, width)
+	offset := width - len(visible)
+	for i, v := range visible {
+		data[offset+i] = v
 	}
 
-	return lipgloss.NewStyle().Foreground(color).Render(sb.String())
+	var lines []string
+	for r := height - 1; r >= 0; r-- {
+		var sb strings.Builder
+		rowBottom := float64(r) / float64(height) * 100.0
+		rowTop := float64(r+1) / float64(height) * 100.0
+		rowRange := rowTop - rowBottom
+
+		for _, v := range data {
+			if v > 100 {
+				v = 100
+			}
+			if v >= rowTop {
+				sb.WriteRune('█')
+			} else if v <= rowBottom {
+				sb.WriteRune(' ')
+			} else {
+				// Partial fill
+				frac := (v - rowBottom) / rowRange
+				idx := 1 + int(frac*float64(len(sparkChars)-2))
+				if idx >= len(sparkChars) {
+					idx = len(sparkChars) - 1
+				}
+				if idx < 0 {
+					idx = 0
+				}
+				sb.WriteRune(sparkChars[idx])
+			}
+		}
+		lines = append(lines, lipgloss.NewStyle().Foreground(color).Render(sb.String()))
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 // ── Utility ─────────────────────────────────────────────────────────────────
@@ -260,7 +258,6 @@ func Teal(s string) string {
 	return lipgloss.NewStyle().Foreground(Tertiary()).Render(s)
 }
 
-// FormatBytes converts bytes to human-readable format
 func FormatBytes(bytes uint64) string {
 	const (
 		KB = 1024
@@ -286,11 +283,21 @@ func FormatBytesRate(bytes uint64) string {
 	return FormatBytes(bytes) + "/s"
 }
 
-// Pad right-pads a string to a given visual width
 func Pad(s string, width int) string {
 	w := lipgloss.Width(s)
 	if w >= width {
 		return s
 	}
 	return s + strings.Repeat(" ", width-w)
+}
+
+func truncateToWidth(s string, maxW int) string {
+	if maxW <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	for len(runes) > 0 && lipgloss.Width(string(runes)) > maxW {
+		runes = runes[:len(runes)-1]
+	}
+	return string(runes)
 }

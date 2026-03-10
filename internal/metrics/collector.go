@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
 	"time"
@@ -47,6 +48,9 @@ func CollectSnapshot() (Snapshot, error) {
 
 	// Sensors (temperatures + battery)
 	snap.Sensors = collectSensors()
+
+	// GPUs
+	snap.GPUs = collectGPUs()
 
 	return snap, nil
 }
@@ -213,7 +217,7 @@ func collectNetwork() NetworkInfo {
 }
 
 func collectDisks() []DiskInfo {
-	partitions, err := disk.Partitions(false)
+	partitions, err := disk.Partitions(true)
 	if err != nil {
 		return nil
 	}
@@ -222,10 +226,17 @@ func collectDisks() []DiskInfo {
 	seen := make(map[string]bool)
 
 	for _, p := range partitions {
-		if seen[p.Mountpoint] {
+		// Filter out noisy virtual/loop filesystems but keep btrfs/lvm root
+		if p.Fstype == "squashfs" || p.Fstype == "tmpfs" || p.Fstype == "devtmpfs" ||
+			strings.HasPrefix(p.Mountpoint, "/snap") || strings.HasPrefix(p.Mountpoint, "/var/lib/docker") ||
+			strings.HasPrefix(p.Mountpoint, "/run") || strings.HasPrefix(p.Mountpoint, "/sys") || strings.HasPrefix(p.Mountpoint, "/dev") {
 			continue
 		}
-		seen[p.Mountpoint] = true
+
+		if seen[p.Device] {
+			continue
+		}
+		seen[p.Device] = true
 
 		usage, err := disk.Usage(p.Mountpoint)
 		if err != nil || usage.Total == 0 {
@@ -277,4 +288,41 @@ func collectSensors() SensorInfo {
 	}
 
 	return info
+}
+
+func collectGPUs() []GPUInfo {
+	out, err := exec.Command("nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu", "--format=csv,noheader,nounits").Output()
+	if err != nil {
+		return nil
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	var gpus []GPUInfo
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, ",")
+		if len(parts) != 5 {
+			continue
+		}
+
+		var util float64
+		var memU, memT uint64
+		var temp float64
+
+		fmt.Sscanf(strings.TrimSpace(parts[1]), "%f", &util)
+		fmt.Sscanf(strings.TrimSpace(parts[2]), "%d", &memU)
+		fmt.Sscanf(strings.TrimSpace(parts[3]), "%d", &memT)
+		fmt.Sscanf(strings.TrimSpace(parts[4]), "%f", &temp)
+
+		gpus = append(gpus, GPUInfo{
+			Name:        strings.TrimSpace(parts[0]),
+			Utilization: util,
+			MemoryUsed:  memU,
+			MemoryTotal: memT,
+			Temperature: temp,
+		})
+	}
+	return gpus
 }

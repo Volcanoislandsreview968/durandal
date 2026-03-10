@@ -52,19 +52,30 @@ func (c CPU) View() string {
 	}
 	lines = append(lines, totalLine)
 
-	// Sparkline
-	lines = append(lines, styles.Sparkline(c.History, iw, styles.Primary()))
-
-	// Per-core compact bars — 2 columns if we have space
 	coreCount := len(c.Info.PerCore)
 	if coreCount == 0 {
+		lines = append(lines, styles.Sparkline(c.History, iw, styles.Primary()))
 		return styles.Panel("CPU", strings.Join(lines, "\n"), c.Width, c.Height)
 	}
 
-	maxRows := c.Height - 5 // title border + total + spark + bottom border
-	if maxRows < 2 {
-		maxRows = 2
+	maxCoreRows := (coreCount + 1) / 2
+	if maxCoreRows > c.Height/3 {
+		maxCoreRows = c.Height / 3
 	}
+	if maxCoreRows < 1 {
+		maxCoreRows = 1
+	}
+
+	sparkH := (c.Height - 2) - 1 - maxCoreRows
+	if sparkH < 1 {
+		sparkH = 1
+	}
+
+	// Sparkline
+	lines = append(lines, strings.Split(styles.MultiSparkline(c.History, iw, sparkH, styles.Primary()), "\n")...)
+
+	// Per-core compact bars — 2 columns if we have space
+	maxRows := maxCoreRows
 
 	// Try 2-column layout
 	colW := (iw - 1) / 2 // -1 for gap

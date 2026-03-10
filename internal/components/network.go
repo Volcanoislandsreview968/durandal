@@ -62,14 +62,24 @@ func (n Network) View() string {
 	var lines []string
 
 	// Download
-	lines = append(lines, styles.Accent("▼ IN  ")+styles.Bright(styles.FormatBytesRate(n.Info.BytesRecvRate))+
+	lines = append(lines, styles.Accent("▼ DOWN ")+styles.Bright(styles.FormatBytesRate(n.Info.BytesRecvRate))+
 		styles.Dim("  tot:"+styles.FormatBytes(n.Info.BytesRecv)))
-	lines = append(lines, styles.Sparkline(n.RecvHistory, iw, styles.Primary()))
+
+	usable := n.Height - 2 // borders
+	if usable < 4 {
+		usable = 4
+	}
+	sparkH := (usable - 2) / 2
+	if sparkH < 1 {
+		sparkH = 1
+	}
+
+	lines = append(lines, strings.Split(styles.MultiSparkline(n.RecvHistory, iw, sparkH, styles.Primary()), "\n")...)
 
 	// Upload
-	lines = append(lines, styles.Pink("▲ OUT ")+styles.Bright(styles.FormatBytesRate(n.Info.BytesSentRate))+
+	lines = append(lines, styles.Pink("▲ UP   ")+styles.Bright(styles.FormatBytesRate(n.Info.BytesSentRate))+
 		styles.Dim("  tot:"+styles.FormatBytes(n.Info.BytesSent)))
-	lines = append(lines, styles.Sparkline(n.SendHistory, iw, styles.Secondary()))
+	lines = append(lines, strings.Split(styles.MultiSparkline(n.SendHistory, iw, sparkH, styles.Secondary()), "\n")...)
 
 	return styles.Panel("NET", strings.Join(lines, "\n"), n.Width, n.Height)
 }

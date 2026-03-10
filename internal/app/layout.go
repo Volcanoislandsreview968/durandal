@@ -5,8 +5,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// calculateLayout distributes terminal dimensions strictly so nothing overflows.
-// Every pixel is accounted for. The total of all heights MUST equal m.Height.
+// calculateLayout distributes terminal dimensions for a custom asymmetric UI.
+// Every pixel is accounted for.
 func calculateLayout(m Model) Model {
 	w := m.Width
 	h := m.Height
@@ -18,64 +18,76 @@ func calculateLayout(m Model) Model {
 	// Reserve fixed rows: header (1) + help bar (1) = 2
 	usableH := h - 2
 
-	// Vertical split: top panels | process list | bottom panels
-	// Proportions: 35% / 40% / 25% — clamped
-	topH := usableH * 35 / 100
-	bottomH := usableH * 25 / 100
-	procH := usableH - topH - bottomH
+	// Process list takes full usable height
+	procH := usableH
 
-	// Minimums
-	if topH < 6 {
-		topH = 6
+	// Width split: Left stats (35%) | Process list (65%)
+	leftW := w * 35 / 100
+	if leftW < 30 {
+		leftW = 30
 	}
-	if bottomH < 6 {
-		bottomH = 6
-	}
-	if procH < 5 {
-		procH = 5
+	rightW := w - leftW
+	if rightW < 30 {
+		rightW = 30
+		leftW = w - rightW
 	}
 
-	// Rebalance if we overshoot
-	total := topH + procH + bottomH
-	if total > usableH {
-		excess := total - usableH
-		// Shrink process list first, then bottom, then top
-		if procH-excess >= 5 {
-			procH -= excess
-		} else {
-			procH = 5
-			excess = topH + 5 + bottomH - usableH
-			if bottomH-excess >= 4 {
-				bottomH -= excess
-			} else {
-				bottomH = 4
-				topH = usableH - procH - bottomH
-			}
+	// GPU check
+	gpuH := 0
+	if len(m.GPU.GPUs) > 0 {
+		gpuH = usableH * 15 / 100
+		if gpuH < 6 {
+			gpuH = 6
 		}
 	}
 
-	// Header — uses full width, 1 line
+	// Vertical split for left column: CPU | [GPU] | MEM | NET | DISK
+	cpuH := usableH * 25 / 100
+	memH := usableH * 25 / 100
+	netH := usableH * 20 / 100
+	diskH := usableH - cpuH - gpuH - memH - netH
+
+	// Minimums
+	if cpuH < 6 {
+		cpuH = 6
+	}
+	if memH < 6 {
+		memH = 6
+	}
+	if netH < 6 {
+		netH = 6
+	}
+
+	// Recalculate Disk to absorb rounding/minimums
+	diskH = usableH - cpuH - gpuH - memH - netH
+	if diskH < 6 {
+		diskH = 6
+	}
+
+	// Header & HelpBar
 	m.Header.Width = w
 
-	// Top row: CPU (60%) | MEM (40%)
-	cpuW := w * 60 / 100
-	memW := w - cpuW
-	m.CPU.Width = cpuW
-	m.CPU.Height = topH
-	m.Memory.Width = memW
-	m.Memory.Height = topH
+	// Left column components
+	m.CPU.Width = leftW
+	m.CPU.Height = cpuH
+	m.GPU.Width = leftW
+	m.GPU.Height = gpuH
+	m.Memory.Width = leftW
+	m.Memory.Height = memH
+	m.Network.Width = leftW
+	m.Network.Height = netH
+	m.Disk.Width = leftW
+	m.Disk.Height = diskH
 
-	// Middle: process list — full width
-	m.Processes.Width = w
+	// Inspector overlays left column
+	m.Inspector.Width = leftW
+	m.Inspector.Height = usableH
+
+	// Right column
+	m.Processes.Width = rightW
 	m.Processes.Height = procH
 
-	// Bottom: NET (50%) | DISK (50%)
-	netW := w / 2
-	diskW := w - netW
-	m.Network.Width = netW
-	m.Network.Height = bottomH
-	m.Disk.Width = diskW
-	m.Disk.Height = bottomH
+	m.ProcY = 1 // Process list starts immediately after the header
 
 	return m
 }
@@ -84,25 +96,34 @@ func calculateLayout(m Model) Model {
 func renderLayout(m Model) string {
 	header := m.Header.View()
 
-	topRow := lipgloss.JoinHorizontal(lipgloss.Top,
-		m.CPU.View(),
-		m.Memory.View(),
-	)
+	var leftCol string
+	if m.InspectorOpen {
+		leftCol = m.Inspector.View()
+	} else {
+		var panels []string
+		panels = append(panels, m.CPU.View())
+
+		gpuView := m.GPU.View()
+		if gpuView != "" {
+			panels = append(panels, gpuView)
+		}
+
+		panels = append(panels, m.Memory.View(), m.Network.View(), m.Disk.View())
+		leftCol = lipgloss.JoinVertical(lipgloss.Left, panels...)
+	}
 
 	procs := m.Processes.View()
 
-	bottomRow := lipgloss.JoinHorizontal(lipgloss.Top,
-		m.Network.View(),
-		m.Disk.View(),
+	middleRow := lipgloss.JoinHorizontal(lipgloss.Top,
+		leftCol,
+		procs,
 	)
 
 	helpBar := components.HelpBar(m.Width, false)
 
 	return lipgloss.JoinVertical(lipgloss.Left,
 		header,
-		topRow,
-		procs,
-		bottomRow,
+		middleRow,
 		helpBar,
 	)
 }
