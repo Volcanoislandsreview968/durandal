@@ -32,7 +32,6 @@ func (c *CPU) Update(info metrics.CPUInfo) {
 }
 
 func (c CPU) View() string {
-	// Inner content width = outer - 2 (border chars)
 	iw := c.Width - 2
 	if iw < 10 {
 		iw = 10
@@ -40,22 +39,22 @@ func (c CPU) View() string {
 
 	var lines []string
 
-	// Overall percentage with color
+	// Big bold percentage
 	pctStr := lipgloss.NewStyle().
 		Foreground(styles.UsageColor(c.Info.TotalPercent)).
 		Bold(true).
 		Render(fmt.Sprintf("%.1f%%", c.Info.TotalPercent))
 
-	totalLine := styles.Dim("TOTAL ") + pctStr
+	totalLine := pctStr
 	if c.Info.Threads > 0 {
-		totalLine += styles.Dim(fmt.Sprintf("  %d threads", c.Info.Threads))
+		totalLine += styles.Dim(fmt.Sprintf("  %d THREADS", c.Info.Threads))
 	}
 	lines = append(lines, totalLine)
 
 	coreCount := len(c.Info.PerCore)
 	if coreCount == 0 {
 		lines = append(lines, styles.Sparkline(c.History, iw, styles.Primary()))
-		return styles.TechPanel("CPU", strings.Join(lines, "\n"), c.Width, c.Height, styles.NeonLime)
+		return styles.MagPanel("CPU", strings.Join(lines, "\n"), c.Width, c.Height, styles.NeonLime)
 	}
 
 	maxCoreRows := (coreCount + 1) / 2
@@ -77,11 +76,9 @@ func (c CPU) View() string {
 	// Per-core compact bars — 2 columns if we have space
 	maxRows := maxCoreRows
 
-	// Try 2-column layout
-	colW := (iw - 1) / 2 // -1 for gap
+	colW := (iw - 1) / 2
 	if colW < 15 || coreCount <= maxRows {
-		// Single column
-		barW := iw - 9 // "CORE XX "
+		barW := iw - 9
 		for i := 0; i < coreCount && i < maxRows; i++ {
 			pct := c.Info.PerCore[i]
 			label := styles.Dim(fmt.Sprintf("C%-2d", i))
@@ -89,11 +86,10 @@ func (c CPU) View() string {
 			lines = append(lines, label+" "+bar)
 		}
 		if coreCount > maxRows {
-			lines = append(lines, styles.Dim(fmt.Sprintf("  +%d more", coreCount-maxRows)))
+			lines = append(lines, styles.Dim(fmt.Sprintf("  +%d MORE", coreCount-maxRows)))
 		}
 	} else {
-		// Two columns
-		barW := colW - 5 // "CXX "
+		barW := colW - 5
 		perCol := (coreCount + 1) / 2
 		if perCol > maxRows {
 			perCol = maxRows
@@ -119,5 +115,5 @@ func (c CPU) View() string {
 		}
 	}
 
-	return styles.TechPanel("CPU", strings.Join(lines, "\n"), c.Width, c.Height, styles.NeonLime)
+	return styles.MagPanel("CPU", strings.Join(lines, "\n"), c.Width, c.Height, styles.NeonLime)
 }

@@ -14,12 +14,13 @@ import (
 
 // Processes shows a scrollable sorted process list with kill support.
 type Processes struct {
-	Width     int
-	Height    int
-	List      []metrics.ProcessInfo
-	Cursor    int
-	SortByCPU bool
-	Offset    int
+	Width       int
+	Height      int
+	List        []metrics.ProcessInfo
+	Cursor      int
+	SelectedPID int32
+	SortByCPU   bool
+	Offset      int
 
 	// Search state
 	FilterInput textinput.Model
@@ -27,9 +28,9 @@ type Processes struct {
 	filterTerm  string
 
 	// Kill state
-	KillConfirm    bool   // waiting for Y/N confirmation
-	KillErrorPopup string // status message for permission denied popup
-	KillResult     string // status message after attempt
+	KillConfirm    bool
+	KillErrorPopup string
+	KillResult     string
 	KillTime       time.Time
 }
 
@@ -47,7 +48,6 @@ func NewProcesses() Processes {
 }
 
 func (p *Processes) Update(procs []metrics.ProcessInfo) {
-	// Apply filter
 	var filtered []metrics.ProcessInfo
 	term := strings.ToLower(p.filterTerm)
 
@@ -64,11 +64,31 @@ func (p *Processes) Update(procs []metrics.ProcessInfo) {
 	}
 
 	p.List = filtered
-	if p.Cursor >= len(p.List) {
-		p.Cursor = len(p.List) - 1
+
+	// Track selected PID across updates
+	found := false
+	if p.SelectedPID != 0 {
+		for i, proc := range p.List {
+			if proc.PID == p.SelectedPID {
+				p.Cursor = i
+				found = true
+				break
+			}
+		}
 	}
-	if p.Cursor < 0 {
-		p.Cursor = 0
+
+	if !found {
+		if p.Cursor >= len(p.List) {
+			p.Cursor = len(p.List) - 1
+		}
+		if p.Cursor < 0 {
+			p.Cursor = 0
+		}
+		if len(p.List) > 0 {
+			p.SelectedPID = p.List[p.Cursor].PID
+		} else {
+			p.SelectedPID = 0
+		}
 	}
 
 	if p.KillResult != "" && time.Since(p.KillTime) > 3*time.Second {
@@ -78,9 +98,10 @@ func (p *Processes) Update(procs []metrics.ProcessInfo) {
 
 func (p *Processes) SetFilter(term string) {
 	p.filterTerm = term
-	// Re-applying filter immediately isn't deeply necessary because snapshotMsg ticks every second,
-	// but it makes UI snappier to at least reset cursor
 	p.Cursor = 0
+	if len(p.List) > 0 {
+		p.SelectedPID = p.List[0].PID
+	}
 }
 
 func (p *Processes) ScrollUp() {
@@ -89,6 +110,7 @@ func (p *Processes) ScrollUp() {
 	}
 	if p.Cursor > 0 {
 		p.Cursor--
+		p.SelectedPID = p.List[p.Cursor].PID
 	}
 }
 
@@ -98,6 +120,7 @@ func (p *Processes) ScrollDown() {
 	}
 	if p.Cursor < len(p.List)-1 {
 		p.Cursor++
+		p.SelectedPID = p.List[p.Cursor].PID
 	}
 }
 
@@ -128,14 +151,13 @@ func (p *Processes) ConfirmKill() {
 	}
 	proc := p.List[p.Cursor]
 
-	// Use os-level process handling for cross-platform compat
 	osProc, err := os.FindProcess(int(proc.PID))
 	if err == nil {
 		err = osProc.Kill()
 	}
 
 	if err != nil {
-		p.KillResult = fmt.Sprintf("✗ kill %d (%s): %v", proc.PID, proc.Name, err)
+		p.KillResult = fmt.Sprintf("✗ KILL %d (%s): %v", proc.PID, proc.Name, err)
 	} else {
 		p.KillResult = fmt.Sprintf("✓ KILL → %d (%s)", proc.PID, proc.Name)
 	}
@@ -155,7 +177,7 @@ func (p Processes) View() string {
 			styles.Dim("[Press Esc or Enter to close]")
 
 		content := lipgloss.Place(p.Width-2, p.Height-2, lipgloss.Center, lipgloss.Center, popup)
-		return styles.TechPanel("ERROR", content, p.Width, p.Height, styles.Red)
+		return styles.MagPanel("ERROR", content, p.Width, p.Height, styles.Red)
 	}
 
 	iw := p.Width - 4
@@ -177,7 +199,6 @@ func (p Processes) View() string {
 		statusText += styles.Dim("  FILTER:") + styles.Teal("/"+p.filterTerm)
 	}
 
-	// Status Line: Kill confirm OR filter bar OR standard sort
 	statusLine := statusText
 
 	if p.KillConfirm && p.Cursor >= 0 && p.Cursor < len(p.List) {
@@ -198,11 +219,16 @@ func (p Processes) View() string {
 	lines = append(lines, " "+statusLine)
 	lines = append(lines, "")
 
-	// Table header - solid block
+	// Table header — bold reversed bar
 	hdr := fmtProcRow("PID", "COMMAND", "CPU%", "MEM%", "RSS", "USER", iw)
-	lines = append(lines, " "+lipgloss.NewStyle().Foreground(styles.DeepBlack).Background(styles.MutedGrey).Bold(true).Render(hdr))
+	lines = append(lines, " "+lipgloss.NewStyle().
+		Foreground(styles.DeepBlack).
+		Background(styles.MutedGrey).
+		Bold(true).
+		Render(hdr))
 
-	visibleRows := p.Height - 5
+	// Account for: MagPanel header(1) + bottom rule(1) + status line(1) + blank(1) + table header(1) + padding(1)
+	visibleRows := p.Height - 7
 	if visibleRows < 1 {
 		visibleRows = 1
 	}
@@ -251,7 +277,7 @@ func (p Processes) View() string {
 		lines = append(lines, " "+row)
 	}
 
-	return styles.TechPanel("PROCESS ARCHIVE", strings.Join(lines, "\n"), p.Width, p.Height, styles.Primary())
+	return styles.MagPanel("PROCESSES", strings.Join(lines, "\n"), p.Width, p.Height, styles.Primary())
 }
 
 func fmtProcRow(pid, name, cpu, mem, rss, user string, maxW int) string {

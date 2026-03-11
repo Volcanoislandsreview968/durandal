@@ -36,17 +36,14 @@ func (g GPU) View() string {
 	var lines []string
 
 	for i, gpu := range g.GPUs {
-		// Name
 		name := gpu.Name
 		if len(name) > iw {
 			name = name[:iw]
 		}
 		lines = append(lines, styles.Dim("GPU ")+fmt.Sprintf("%d: ", i)+styles.Bright(name))
 
-		// Utilization & Temp
 		lines = append(lines, styles.Dim("UTIL: ")+styles.Accent(fmt.Sprintf("%3.0f%%", gpu.Utilization))+styles.Dim(fmt.Sprintf("  TEMP: %.0f°C", gpu.Temperature)))
 
-		// Memory Setup
 		pct := 0.0
 		if gpu.MemoryTotal > 0 {
 			pct = float64(gpu.MemoryUsed) / float64(gpu.MemoryTotal) * 100.0
@@ -58,7 +55,6 @@ func (g GPU) View() string {
 			barW = 5
 		}
 
-		// Rendering Bar + Text
 		lines = append(lines, styles.Bar(pct, barW, styles.Tertiary())+" "+styles.Dim(memStr))
 
 		if i < len(g.GPUs)-1 {
@@ -66,5 +62,5 @@ func (g GPU) View() string {
 		}
 	}
 
-	return styles.TechPanel("GPU ACCELERATOR", strings.Join(lines, "\n"), g.Width, g.Height, styles.NeonLime)
+	return styles.MagPanel("GPU", strings.Join(lines, "\n"), g.Width, g.Height, styles.NeonLime)
 }

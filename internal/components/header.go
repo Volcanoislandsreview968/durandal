@@ -1,7 +1,6 @@
 package components
 
 import (
-	"math/rand"
 	"strings"
 
 	"github.com/blumenwagen/durandal/internal/metrics"
@@ -9,28 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func glitchString(s string, chance float64, intensity int) string {
-	if rand.Float64() > chance {
-		return s
-	}
-	chars := []rune(s)
-	if len(chars) == 0 {
-		return s
-	}
-	if intensity <= 0 {
-		intensity = 1
-	}
-	numGlitches := rand.Intn(intensity) + 1
-	glitchChars := []rune("█▓▒░×÷±#@_/")
-	for i := 0; i < numGlitches; i++ {
-		idx := rand.Intn(len(chars))
-		gIdx := rand.Intn(len(glitchChars))
-		chars[idx] = glitchChars[gIdx]
-	}
-	return string(chars)
-}
-
-// Header renders the top HUD bar — no border box, just a single styled line.
+// Header renders the top masthead — bold brutalist banner.
 type Header struct {
 	Width int
 	Host  metrics.HostInfo
@@ -47,64 +25,88 @@ func (h Header) View() string {
 		return ""
 	}
 
-	left := lipgloss.NewStyle().Foreground(styles.NeonLime).Bold(true).Render(styles.TextTracking("D U R A N D A L "))
-	left += lipgloss.NewStyle().Foreground(styles.BrightWht).Render(" /// S Y S T E M S")
+	// ══════════════════════════════════════════════════════════════════
+	//  █ DURANDAL ██████████████████████████  user@host // uptime: 5m
+	// ══════════════════════════════════════════════════════════════════
 
-	// We safely extract username from host object
+	// Left: Bold app name in reversed block
+	appName := " █ DURANDAL "
+	nameBlock := lipgloss.NewStyle().
+		Background(styles.Primary()).
+		Foreground(styles.DeepBlack).
+		Bold(true).
+		Render(appName)
+
+	tagline := lipgloss.NewStyle().
+		Foreground(styles.MutedGrey).
+		Render(" SYSTEMS MONITOR")
+
+	// Right: System info
 	username := h.Host.User
 	if username == "" {
 		username = "system"
 	}
 
-	right := styles.Dim("USER: ") + lipgloss.NewStyle().Foreground(styles.Primary()).Render(username)
+	var infoParts []string
+	infoParts = append(infoParts, lipgloss.NewStyle().Foreground(styles.Primary()).Bold(true).Render(username))
 	if h.Host.Hostname != "" {
-		right += styles.Dim(" @ ") + styles.Bright(h.Host.Hostname)
+		infoParts = append(infoParts, lipgloss.NewStyle().Foreground(styles.MutedGrey).Render("@")+
+			styles.Bright(h.Host.Hostname))
 	}
 
-	// Uptime is pre-formatted as string inside metrics.HostInfo
-	right += styles.Dim(" // UPTIME: ") + styles.Accent(h.Host.Uptime)
+	right := strings.Join(infoParts, "")
+	if h.Host.Uptime != "" {
+		right += lipgloss.NewStyle().Foreground(styles.MutedGrey).Render("  //  ") +
+			lipgloss.NewStyle().Foreground(styles.Tertiary()).Render(h.Host.Uptime)
+	}
 
+	left := nameBlock + tagline
 	leftW := lipgloss.Width(left)
 	rightW := lipgloss.Width(right)
 
-	fillAmt := h.Width - leftW - rightW
+	fillAmt := h.Width - leftW - rightW - 1
 	if fillAmt < 0 {
 		fillAmt = 0
 	}
 
-	// ▛▀▀▀▀▀▀▀   ▀▀▀▀▀▀▀▜
-	// ▌ DURANDAL ...    ▐
-	// ▙▄▄▄▄▄▄▄   ▄▄▄▄▄▄▄▟
-	// Instead of a full TechPanel, the header is just a structured bar
-	barText := left + strings.Repeat(" ", fillAmt) + right
+	barText := left + strings.Repeat(" ", fillAmt) + right + " "
 	return lipgloss.NewStyle().Background(styles.DarkNavy).Render(barText)
 }
 
-// HelpBar renders the bottom keybinding reference bar.
+// HelpBar renders the bottom keybinding reference bar — brutalist pill badges.
 func HelpBar(w int, dimmed bool) string {
 	keys := []struct{ key, desc string }{
-		{"↑/k", "up"},
-		{"↓/j", "down"},
-		{"s", "sort"},
-		{"/", "search"},
-		{"⏎", "inspect"},
-		{"K", "kill"},
-		{"d", "dim"},
-		{"q", "quit"},
+		{"↑/k", "UP"},
+		{"↓/j", "DN"},
+		{"s", "SORT"},
+		{"/", "FIND"},
+		{"⏎", "INSPECT"},
+		{"K", "KILL"},
+		{"d", "DIM"},
+		{"q", "QUIT"},
 	}
+
+	keyStyle := lipgloss.NewStyle().
+		Background(styles.MutedGrey).
+		Foreground(styles.BrightWht).
+		Bold(true)
+
+	descStyle := lipgloss.NewStyle().
+		Foreground(styles.MutedGrey)
 
 	var parts []string
 	for _, k := range keys {
-		parts = append(parts, styles.Accent(k.key)+styles.Dim(" "+k.desc))
+		badge := keyStyle.Render(" " + k.key + " ")
+		label := descStyle.Render(" " + k.desc)
+		parts = append(parts, badge+label)
 	}
-	bar := strings.Join(parts, styles.Dim("  │  "))
+	bar := strings.Join(parts, "  ")
 
 	barW := lipgloss.Width(bar)
 	if barW >= w {
 		return bar
 	}
 
-	// Center the bar
 	pad := (w - barW) / 2
 	return strings.Repeat(" ", pad) + bar
 }

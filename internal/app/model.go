@@ -12,7 +12,6 @@ import (
 
 type tickMsg time.Time
 type snapshotMsg metrics.Snapshot
-type glitchTickMsg time.Time
 
 // Model is the root Bubble Tea model.
 type Model struct {
@@ -48,26 +47,12 @@ func NewModel() Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(tickCmd(), collectCmd(), glitchTickCmd())
+	return tea.Batch(tickCmd(), collectCmd())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		// Inspector view keys
-		if m.InspectorOpen {
-			switch msg.String() {
-			case "esc", "enter", "q":
-				if msg.String() == "q" {
-					m.quitting = true
-					return m, tea.Quit
-				}
-				m.InspectorOpen = false
-			case "d":
-				styles.Dimmed = !styles.Dimmed
-			}
-			return m, nil
-		}
 
 		// If process list is filtering, route keys to textinput
 		if m.Processes.IsFiltering {
@@ -107,22 +92,36 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
+		case "esc":
+			if m.InspectorOpen {
+				m.InspectorOpen = false
+			}
 		case "q", "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
 		case "j", "down":
 			m.Processes.ScrollDown()
+			if m.InspectorOpen && len(m.Processes.List) > 0 && m.Processes.Cursor >= 0 && m.Processes.Cursor < len(m.Processes.List) {
+				m.Inspector.Update(m.Processes.List[m.Processes.Cursor])
+			}
 		case "k", "up":
 			m.Processes.ScrollUp()
+			if m.InspectorOpen && len(m.Processes.List) > 0 && m.Processes.Cursor >= 0 && m.Processes.Cursor < len(m.Processes.List) {
+				m.Inspector.Update(m.Processes.List[m.Processes.Cursor])
+			}
 		case "s", "tab":
 			m.Processes.ToggleSort()
 		case "/":
 			m.Processes.IsFiltering = true
 			m.Processes.FilterInput.Focus()
 		case "enter":
-			if len(m.Processes.List) > 0 && m.Processes.Cursor >= 0 {
-				m.InspectorOpen = true
-				m.Inspector.Update(m.Processes.List[m.Processes.Cursor])
+			if m.InspectorOpen {
+				m.InspectorOpen = false
+			} else {
+				if len(m.Processes.List) > 0 && m.Processes.Cursor >= 0 {
+					m.InspectorOpen = true
+					m.Inspector.Update(m.Processes.List[m.Processes.Cursor])
+				}
 			}
 		case "K": // Shift+K to kill
 			m.Processes.RequestKill()
@@ -131,23 +130,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.MouseMsg:
-		if m.InspectorOpen {
-			return m, nil // Block process interactions behind inspector
-		}
 		switch msg.Type {
 		case tea.MouseWheelUp:
 			m.Processes.ScrollUp()
+			if m.InspectorOpen && len(m.Processes.List) > 0 && m.Processes.Cursor >= 0 && m.Processes.Cursor < len(m.Processes.List) {
+				m.Inspector.Update(m.Processes.List[m.Processes.Cursor])
+			}
 		case tea.MouseWheelDown:
 			m.Processes.ScrollDown()
+			if m.InspectorOpen && len(m.Processes.List) > 0 && m.Processes.Cursor >= 0 && m.Processes.Cursor < len(m.Processes.List) {
+				m.Inspector.Update(m.Processes.List[m.Processes.Cursor])
+			}
 		case tea.MouseLeft:
-			contentStartY := m.ProcY + 3
+			contentStartY := m.ProcY + 4
 			contentEndY := m.ProcY + m.Processes.Height - 1
 			if msg.Y >= contentStartY && msg.Y < contentEndY {
 				clickedIdx := msg.Y - contentStartY + m.Processes.Offset
 				if clickedIdx >= 0 && clickedIdx < len(m.Processes.List) {
 					m.Processes.Cursor = clickedIdx
+					m.Processes.SelectedPID = m.Processes.List[clickedIdx].PID
 					if m.Processes.KillConfirm {
 						m.Processes.CancelKill()
+					}
+					if m.InspectorOpen {
+						m.Inspector.Update(m.Processes.List[m.Processes.Cursor])
 					}
 				}
 			}
@@ -158,10 +164,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Height = msg.Height
 		m.ready = true
 		m = calculateLayout(m)
-
-	case glitchTickMsg:
-		// Fast loop (100ms) for aesthetic UI updates like glitches
-		return m, glitchTickCmd()
 
 	case tickMsg:
 		return m, tea.Batch(tickCmd(), collectCmd())
@@ -189,6 +191,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.Network.Update(snap.Network)
 		m.Disk.Update(snap.Disks)
+
+		if m.ready {
+			m = calculateLayout(m)
+		}
 	}
 
 	return m, nil
@@ -207,12 +213,6 @@ func (m Model) View() string {
 func tickCmd() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
 		return tickMsg(t)
-	})
-}
-
-func glitchTickCmd() tea.Cmd {
-	return tea.Tick(time.Millisecond*150, func(t time.Time) tea.Msg {
-		return glitchTickMsg(t)
 	})
 }
 

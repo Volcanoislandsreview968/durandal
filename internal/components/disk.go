@@ -29,7 +29,7 @@ func (d Disk) View() string {
 
 	var lines []string
 
-	maxDisks := (d.Height - 2) / 2 // each disk takes 2 lines (label + bar)
+	maxDisks := (d.Height - 2) / 2
 	if maxDisks < 1 {
 		maxDisks = 1
 	}
@@ -55,5 +55,5 @@ func (d Disk) View() string {
 		lines = append(lines, styles.GradientBar(disk.UsedPercent, barW))
 	}
 
-	return styles.TechPanel("STORAGE", strings.Join(lines, "\n"), d.Width, d.Height, styles.Amber)
+	return styles.MagPanel("STORAGE", strings.Join(lines, "\n"), d.Width, d.Height, styles.Amber)
 }

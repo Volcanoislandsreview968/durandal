@@ -16,7 +16,7 @@ func init() {
 	}
 }
 
-// ── Marathon Color Palette ──────────────────────────────────────────────────
+// ── Marathon Brutalist Color Palette ────────────────────────────────────────
 
 var (
 	NeonLime  = lipgloss.Color("#BFFF00")
@@ -25,8 +25,8 @@ var (
 	DeepBlack = lipgloss.Color("#0A0A0A")
 	DarkNavy  = lipgloss.Color("#12121F")
 	Charcoal  = lipgloss.Color("#1A1A2E")
-	MutedGrey = lipgloss.Color("#3E3E50")
-	DimGrey   = lipgloss.Color("#1F1F2E")
+	MutedGrey = lipgloss.Color("#8A8A9E")
+	DimGrey   = lipgloss.Color("#4A4A5A")
 	OffWhite  = lipgloss.Color("#D8D8E8")
 	BrightWht = lipgloss.Color("#FFFFFF")
 	Amber     = lipgloss.Color("#FFB800")
@@ -91,88 +91,100 @@ func Tertiary() lipgloss.Color {
 	return Cyan
 }
 
-// ── Panel Rendering ─────────────────────────────────────────────────────────
+// ── Brutalist Panel System ──────────────────────────────────────────────────
+//
+// Replaces TechPanel with a bolder, magazine-inspired brutalist layout:
+//   ████████████████████████████████
+//   █  S E C T I O N   N A M E   █   ← bold reversed header block
+//   ████████████████████████████████
+//   ▎ content line 1                  ← thin left accent stripe
+//   ▎ content line 2
+//   ▎ content line 3
+//   ─────────────────────────────     ← thin bottom rule
 
-func TechPanel(title string, content string, width, height int, accent lipgloss.Color) string {
-	innerW := width - 2
+func MagPanel(title string, content string, width, height int, accent lipgloss.Color) string {
+	innerW := width
 	if innerW < 1 {
 		innerW = 1
 	}
-	innerH := height - 2
+	innerH := height - 2 // header thick bar (1 line) + bottom rule (1 line)
 	if innerH < 1 {
 		innerH = 1
 	}
 
-	topBorder := buildSciFiBorder(title, innerW, accent)
+	// ── Thick header bar ──
+	headerBar := SectionHeader(title, innerW, accent)
+
+	// ── Content with left accent stripe ──
 	contentLines := strings.Split(content, "\n")
+	stripe := lipgloss.NewStyle().Foreground(accent).Render("▎")
 
 	var body strings.Builder
-
-	// Create rigid vertical side borders that match the accent color
-	borderStyle := lipgloss.NewStyle().Foreground(accent)
-
 	for i := 0; i < innerH; i++ {
 		line := ""
 		if i < len(contentLines) {
 			line = contentLines[i]
 		}
 
-		// We add a literal space margin inside the text area for breathability
 		paddedLine := " " + line
 		lineW := lipgloss.Width(paddedLine)
 
-		if lineW > innerW-1 { // -1 to preserve right margin space
-			paddedLine = truncateToWidth(paddedLine, innerW-1) + " "
-		} else if lineW < innerW {
-			paddedLine = paddedLine + strings.Repeat(" ", innerW-lineW)
+		if lineW > innerW-2 {
+			paddedLine = truncateToWidth(paddedLine, innerW-2)
+		} else if lineW < innerW-1 {
+			paddedLine = paddedLine + strings.Repeat(" ", innerW-1-lineW)
 		}
 
-		borderChar := borderStyle.Render("▌")
-		body.WriteString(borderChar + paddedLine + borderStyle.Render("▐") + "\n")
+		body.WriteString(stripe + paddedLine + "\n")
 	}
 
-	bottomBorder := borderStyle.Render("▙" + strings.Repeat("▄", innerW) + "▟")
+	// ── Bottom rule ──
+	bottomRule := lipgloss.NewStyle().Foreground(DimGrey).Render(strings.Repeat("─", innerW))
 
-	return topBorder + "\n" + body.String() + bottomBorder
+	return headerBar + "\n" + body.String() + bottomRule
 }
 
-func buildSciFiBorder(title string, innerW int, accent lipgloss.Color) string {
-	accentStyle := lipgloss.NewStyle().Foreground(accent)
+// SectionHeader renders a full-width bold header with reversed label and accent fill.
+//
+//	▌ S E C T I O N ▐▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+func SectionHeader(label string, width int, accent lipgloss.Color) string {
+	tracked := TextTracking(strings.ToUpper(label))
 
-	if title == "" {
-		return accentStyle.Render("▛" + strings.Repeat("▀", innerW) + "▜")
+	// Reversed label portion
+	labelPart := lipgloss.NewStyle().
+		Foreground(DeepBlack).
+		Background(accent).
+		Bold(true).
+		Render(" " + tracked + " ")
+
+	labelW := lipgloss.Width(labelPart)
+
+	// Accent-colored fill rule
+	fillCount := width - labelW
+	if fillCount < 0 {
+		fillCount = 0
 	}
+	fillPart := lipgloss.NewStyle().
+		Foreground(accent).
+		Render(strings.Repeat("▀", fillCount))
 
-	// ▛▀▀ [ T I T L E ] ▀▀▀▀▀▀▀▀▀▀ /// ▀▀▜
-	trackedTitle := TextTracking(strings.ToUpper(title))
+	return labelPart + fillPart
+}
 
-	titleBracketL := lipgloss.NewStyle().Foreground(BrightWht).Bold(true).Render("[ ")
-	titleText := lipgloss.NewStyle().Foreground(DeepBlack).Background(accent).Bold(true).Render(trackedTitle)
-	titleBracketR := lipgloss.NewStyle().Foreground(BrightWht).Bold(true).Render(" ]")
+// ThickBar renders a solid block accent bar (purely decorative).
+func ThickBar(width int, color lipgloss.Color) string {
+	return lipgloss.NewStyle().Foreground(color).Render(strings.Repeat("█", width))
+}
 
-	// Assembly the title portion
-	fullTitle := titleBracketL + titleText + titleBracketR
-	titleVisualWidth := lipgloss.Width(fullTitle)
+// ThinRule renders a subtle horizontal divider.
+func ThinRule(width int, color lipgloss.Color) string {
+	return lipgloss.NewStyle().Foreground(color).Render(strings.Repeat("─", width))
+}
 
-	leftDashCount := 2
-
-	// Calculate the remaining space on the right side
-	rightDashCount := innerW - titleVisualWidth - leftDashCount
-	rightSide := ""
-
-	if rightDashCount >= 7 {
-		// Embed the visual /// decor directly into the structural border
-		mainDashCount := rightDashCount - 6
-		rightSide = accentStyle.Render(strings.Repeat("▀", mainDashCount)) +
-			lipgloss.NewStyle().Foreground(BrightWht).Bold(true).Render(" /// ") +
-			accentStyle.Render("▀▜")
-	} else if rightDashCount >= 0 {
-		rightSide = accentStyle.Render(strings.Repeat("▀", rightDashCount) + "▜")
-	}
-
-	left := accentStyle.Render("▛" + strings.Repeat("▀", leftDashCount))
-
-	return left + fullTitle + rightSide
+// KeyVal renders an aligned key-value pair: dimmed label, bright value.
+func KeyVal(key, val string, keyW int) string {
+	k := Dim(Pad(strings.ToUpper(key), keyW))
+	return k + " " + Bright(val)
 }
 
 func TextTracking(s string) string {
@@ -207,9 +219,8 @@ func Bar(percent float64, width int, fg lipgloss.Color) string {
 	}
 	empty := barW - filled
 
-	// visually richer blocks
 	filledStr := strings.Repeat("█", filled)
-	emptyStr := strings.Repeat("⡀", empty) // subtle dot/line instead of heavy block for empty
+	emptyStr := strings.Repeat("░", empty)
 
 	bar := lipgloss.NewStyle().Foreground(fg).Render(filledStr) +
 		lipgloss.NewStyle().Foreground(DimGrey).Render(emptyStr)
@@ -368,4 +379,11 @@ func truncateToWidth(s string, maxW int) string {
 		runes = runes[:len(runes)-1]
 	}
 	return string(runes)
+}
+
+// ── Legacy compatibility ────────────────────────────────────────────────────
+
+// TechPanel is kept as an alias for MagPanel during migration.
+func TechPanel(title string, content string, width, height int, accent lipgloss.Color) string {
+	return MagPanel(title, content, width, height, accent)
 }

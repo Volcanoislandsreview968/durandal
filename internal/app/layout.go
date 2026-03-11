@@ -36,33 +36,15 @@ func calculateLayout(m Model) Model {
 	gpuH := 0
 	if len(m.GPU.GPUs) > 0 {
 		gpuH = usableH * 15 / 100
-		if gpuH < 6 {
-			gpuH = 6
-		}
 	}
 
 	// Vertical split for left column: CPU | [GPU] | MEM | NET | DISK
 	cpuH := usableH * 25 / 100
 	memH := usableH * 25 / 100
 	netH := usableH * 20 / 100
-	diskH := usableH - cpuH - gpuH - memH - netH
 
-	// Minimums
-	if cpuH < 6 {
-		cpuH = 6
-	}
-	if memH < 6 {
-		memH = 6
-	}
-	if netH < 6 {
-		netH = 6
-	}
-
-	// Recalculate Disk to absorb rounding/minimums
-	diskH = usableH - cpuH - gpuH - memH - netH
-	if diskH < 6 {
-		diskH = 6
-	}
+	// Recalculate Disk to absorb rounding so total matches exactly usableH
+	diskH := usableH - (cpuH + gpuH + memH + netH)
 
 	// Header & HelpBar
 	m.Header.Width = w

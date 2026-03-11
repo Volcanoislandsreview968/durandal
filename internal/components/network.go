@@ -62,10 +62,9 @@ func (n Network) View() string {
 	var lines []string
 
 	// Download
-	lines = append(lines, styles.Accent("▼ DOWN ")+styles.Bright(styles.FormatBytesRate(n.Info.BytesRecvRate))+
-		styles.Dim("  tot:"+styles.FormatBytes(n.Info.BytesRecv)))
+	lines = append(lines, styles.Accent("▼ DOWN ")+styles.Bright(styles.FormatBytesRate(n.Info.BytesRecvRate)))
 
-	usable := n.Height - 2 // borders
+	usable := n.Height - 2
 	if usable < 4 {
 		usable = 4
 	}
@@ -77,9 +76,8 @@ func (n Network) View() string {
 	lines = append(lines, strings.Split(styles.MultiSparkline(n.RecvHistory, iw, sparkH, styles.Primary()), "\n")...)
 
 	// Upload
-	lines = append(lines, styles.Pink("▲ UP   ")+styles.Bright(styles.FormatBytesRate(n.Info.BytesSentRate))+
-		styles.Dim("  tot:"+styles.FormatBytes(n.Info.BytesSent)))
+	lines = append(lines, styles.Pink("▲ UP   ")+styles.Bright(styles.FormatBytesRate(n.Info.BytesSentRate)))
 	lines = append(lines, strings.Split(styles.MultiSparkline(n.SendHistory, iw, sparkH, styles.Secondary()), "\n")...)
 
-	return styles.TechPanel("NETWORK", strings.Join(lines, "\n"), n.Width, n.Height, styles.HotPink)
+	return styles.MagPanel("NETWORK", strings.Join(lines, "\n"), n.Width, n.Height, styles.HotPink)
 }

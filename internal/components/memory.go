@@ -49,14 +49,14 @@ func (m Memory) View() string {
 	lines = append(lines, styles.Bar(m.Info.PercentSwap, iw, swapColor))
 
 	// Cache
-	cache := fmt.Sprintf("cache %s  buf %s", styles.FormatBytes(m.Info.Cached), styles.FormatBytes(m.Info.Buffers))
+	cache := fmt.Sprintf("CACHE %s  BUF %s", styles.FormatBytes(m.Info.Cached), styles.FormatBytes(m.Info.Buffers))
 	lines = append(lines, styles.Dim(cache))
 
 	// Temperatures
 	if len(m.Sensors.Temperatures) > 0 {
-		lines = append(lines, styles.Dim("──────────────────"))
+		lines = append(lines, styles.ThinRule(iw, styles.MutedGrey))
 		maxT := 4
-		remaining := m.Height - len(lines) - 3 // borders + battery
+		remaining := m.Height - len(lines) - 3
 		if remaining < maxT {
 			maxT = remaining
 		}
@@ -99,5 +99,5 @@ func (m Memory) View() string {
 		lines = append(lines, styles.Dim("BAT ")+icon+" "+pctStr)
 	}
 
-	return styles.TechPanel("MEMORY", strings.Join(lines, "\n"), m.Width, m.Height, styles.Cyan)
+	return styles.MagPanel("MEMORY", strings.Join(lines, "\n"), m.Width, m.Height, styles.Cyan)
 }
